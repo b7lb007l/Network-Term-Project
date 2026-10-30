@@ -1,0 +1,18 @@
+# ไฟล์ลับ ห้ามขึ้น git
+*.env
+.env*
+*.htpasswd
+duckdns.ini
+wp-config.php
+id_*
+*.pem
+*.key
+*.ini.bak
+
+# ไฟล์สำรองและไฟล์ระบบ
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini

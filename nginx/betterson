@@ -1,0 +1,77 @@
+server {
+    server_name betterson.duckdns.org;
+    include snippets/hardening.conf;
+
+    root /var/www/betterson;
+    index index.php index.html;
+
+    client_max_body_size 64M;
+    server_tokens off;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header X-Cache $upstream_cache_status always;
+
+    # หน้าที่ห้าม cache: คำขอ POST, มี query string, หน้าแอดมิน/ล็อกอิน, ผู้ที่ล็อกอินอยู่
+    set $skip_cache 0;
+    if ($request_method = POST) { set $skip_cache 1; }
+    if ($query_string != "") { set $skip_cache 1; }
+    if ($request_uri ~* "/wp-admin/|/wp-login.php|/wp-json/|/xmlrpc.php|wp-.*\.php|/feed/|sitemap") { set $skip_cache 1; }
+    if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") { set $skip_cache 1; }
+    
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+    location ^~ /secdash/ {
+        alias /var/www/secdash/;
+        allow 100.64.0.0/10;
+        deny all;
+        auth_basic "Security dashboard";
+        auth_basic_user_file /etc/nginx/secdash.htpasswd;
+    }
+    location = /wp-login.php {
+        limit_req zone=wplogin burst=5 nodelay;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
+    }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
+        fastcgi_cache WORDPRESS;
+        fastcgi_cache_valid 200 301 302 60m;
+        fastcgi_cache_bypass $skip_cache;
+        fastcgi_no_cache $skip_cache;
+    }
+
+    location = /xmlrpc.php {
+        deny all;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/betterson.duckdns.org/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/betterson.duckdns.org/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+server {
+    if ($host = betterson.duckdns.org) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
+    listen 80;
+    listen [::]:80;
+    server_name betterson.duckdns.org;
+    include snippets/hardening.conf;
+    return 404; # managed by Certbot
+
+
+}
